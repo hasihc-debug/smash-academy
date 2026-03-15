@@ -1,0 +1,141 @@
+{
+  "entities": {
+    "Player": {
+      "title": "Player",
+      "description": "A student or athlete in the academy",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "userId": { "type": "string", "description": "The coach who created this player" },
+        "linkedUid": { "type": "string", "description": "The Firebase Auth UID of the player if they have an account" }
+      },
+      "required": ["id", "name", "userId"]
+    },
+    "WeeklySchedule": {
+      "title": "Weekly Schedule",
+      "description": "Training sessions for a specific week",
+      "type": "object",
+      "properties": {
+        "days": { "type": "object" },
+        "userId": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Attendance records for a month",
+      "type": "object",
+      "properties": {
+        "records": { "type": "object" },
+        "userId": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "YTPPlan": {
+      "title": "Yearly Training Plan",
+      "description": "Annual planning for a player or group",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "A competition event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "name", "userId"]
+    },
+    "TournamentEntry": {
+      "title": "Tournament Entry",
+      "description": "A player's result in a tournament",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tournamentId": { "type": "string" },
+        "playerId": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "tournamentId", "playerId", "userId"]
+    },
+    "StudentPayment": {
+      "title": "Student Payment",
+      "description": "Record of a student's fee payment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "playerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "playerId", "amount", "userId"]
+    },
+    "CoachSalary": {
+      "title": "Coach Salary",
+      "description": "Record of a coach's salary payment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "amount": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "amount", "userId"]
+    },
+    "AccessRequest": {
+      "title": "Access Request",
+      "description": "A player's request to link their account to a coach's record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "coachId": { "type": "string" }
+      },
+      "required": ["id", "uid"]
+    }
+  },
+  "firestore": {
+    "/players/{playerId}": {
+      "schema": "Player",
+      "description": "Collection of players"
+    },
+    "/weekly_schedules/{scheduleId}": {
+      "schema": "WeeklySchedule",
+      "description": "Weekly training schedules"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Monthly attendance records"
+    },
+    "/ytp_plans/{planId}": {
+      "schema": "YTPPlan",
+      "description": "Yearly training plans"
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": "Tournament",
+      "description": "Competition events"
+    },
+    "/tournamentEntries/{entryId}": {
+      "schema": "TournamentEntry",
+      "description": "Player results in tournaments"
+    },
+    "/payments/{paymentId}": {
+      "schema": "StudentPayment",
+      "description": "Student fee payments"
+    },
+    "/salaries/{salaryId}": {
+      "schema": "CoachSalary",
+      "description": "Coach salary payments"
+    },
+    "/access_requests/{requestId}": {
+      "schema": "AccessRequest",
+      "description": "Player link requests"
+    }
+  }
+}

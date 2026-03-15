@@ -1,0 +1,169 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validString(field, min, max) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= min && 
+             request.resource.data[field].size() <= max;
+    }
+
+    function validNumber(field, min, max) {
+      return request.resource.data[field] is number && 
+             request.resource.data[field] >= min && 
+             request.resource.data[field] <= max;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             (request.auth.token.email == "hasihc@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidPlayer(data) {
+      return hasRequiredFields(['id', 'name', 'userId']) &&
+             validString('name', 1, 100) &&
+             validString('userId', 1, 100) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+             (!('linkedUid' in data) || (data.linkedUid is string && data.linkedUid.size() <= 100));
+    }
+
+    function isValidSchedule(data) {
+      return hasRequiredFields(['userId']) &&
+             validString('userId', 1, 100);
+    }
+
+    function isValidAttendance(data) {
+      return hasRequiredFields(['userId']) &&
+             validString('userId', 1, 100);
+    }
+
+    function isValidTournament(data) {
+      return hasRequiredFields(['id', 'name', 'userId']) &&
+             validString('name', 1, 200) &&
+             validString('userId', 1, 100);
+    }
+
+    function isValidPayment(data) {
+      return hasRequiredFields(['id', 'playerId', 'amount', 'userId']) &&
+             validNumber('amount', 0, 1000000) &&
+             validString('userId', 1, 100) &&
+             validString('playerId', 1, 100);
+    }
+
+    function isValidSalary(data) {
+      return hasRequiredFields(['id', 'amount', 'userId']) &&
+             validNumber('amount', 0, 1000000) &&
+             validString('userId', 1, 100);
+    }
+
+    function isValidTournamentEntry(data) {
+      return hasRequiredFields(['id', 'tournamentId', 'playerId', 'userId']) &&
+             validString('tournamentId', 1, 100) &&
+             validString('playerId', 1, 100) &&
+             validString('userId', 1, 100);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Players: Created by Coach (userId). Readable by Coach OR Linked Player.
+    match /players/{playerId} {
+      allow create: if isSignedIn() && isValidPlayer(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidPlayer(request.resource.data) && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.linkedUid == request.auth.uid || resource.data.email == request.auth.token.email);
+    }
+
+    // Schedules: Composite ID "USERID_WEEKID"
+    match /weekly_schedules/{scheduleId} {
+      allow read: if isSignedIn() && scheduleId.matches(request.auth.uid + '_.*');
+      allow write: if isSignedIn() && isValidSchedule(request.resource.data) && scheduleId.matches(request.auth.uid + '_.*');
+    }
+
+    // Attendance: Composite ID "USERID_MONTHID"
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn() && attendanceId.matches(request.auth.uid + '_.*');
+      allow write: if isSignedIn() && isValidAttendance(request.resource.data) && attendanceId.matches(request.auth.uid + '_.*');
+    }
+
+    // YTP: Composite ID "USERID_YEAR" or "YEAR_PLAYERID"
+    match /ytp_plans/{planId} {
+       allow read: if isSignedIn() && (planId.matches(request.auth.uid + '_.*') || (resource != null && resource.data.userId == request.auth.uid));
+       allow write: if isSignedIn() && (planId.matches(request.auth.uid + '_.*') || (request.resource != null && request.resource.data.userId == request.auth.uid));
+    }
+
+    // Settings: "settings_USERID"
+    match /settings/{settingId} {
+      allow read: if isSignedIn() && settingId == ('settings_' + request.auth.uid);
+      allow write: if isSignedIn() && settingId == ('settings_' + request.auth.uid);
+    }
+
+    // Tournaments: Filtered by userId
+    match /tournaments/{tournamentId} {
+      allow create: if isSignedIn() && isValidTournament(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidTournament(request.resource.data) && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Tournament Entries: Linked to Tournament. Readable by Coach OR the Athlete.
+    match /tournamentEntries/{entryId} {
+      allow create: if isSignedIn() && isValidTournamentEntry(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidTournamentEntry(request.resource.data) && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource != null && 'playerId' in resource.data && exists(/databases/$(database)/documents/players/$(resource.data.playerId)) && get(/databases/$(database)/documents/players/$(resource.data.playerId)).data.linkedUid == request.auth.uid));
+    }
+
+    // Payments: Filtered by userId. Readable by Coach OR the Athlete.
+    match /payments/{paymentId} {
+      allow create: if isSignedIn() && isValidPayment(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidPayment(request.resource.data) && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource != null && 'playerId' in resource.data && exists(/databases/$(database)/documents/players/$(resource.data.playerId)) && get(/databases/$(database)/documents/players/$(resource.data.playerId)).data.linkedUid == request.auth.uid));
+    }
+
+    // Salaries: Filtered by userId
+    match /salaries/{salaryId} {
+      allow create: if isSignedIn() && isValidSalary(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidSalary(request.resource.data) && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Access Requests:
+    match /access_requests/{requestId} {
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.coachId == request.auth.uid);
+      allow delete: if isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.coachId == request.auth.uid);
+    }
+  }
+}
